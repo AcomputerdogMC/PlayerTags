@@ -1,0 +1,22 @@
+#PlayerTags config file
+
+#Badge for one-year players
+year_badge: "○"
+
+#Badge for mods
+mod_badge: "∆"
+
+#Badge for admins
+admin_badge: "□"
+
+#Uncolored badge for one-year players
+year_badge_raw: "○"
+
+#Uncolored badge for mods
+mod_badge_raw: "∆"
+
+#Uncolored badge for admins
+admin_badge_raw: "□"
+
+#Color for players who have not chosen a color
+default_color: "GRAY"

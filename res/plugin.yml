@@ -1,0 +1,40 @@
+name: PlayerTags
+version: 0.1.0
+description: Gives players name colors and tags
+author: acomputerdog
+main: net.acomputerdog.playertags.PluginPlayerTags
+
+commands:
+  namecolor:
+    description: Allows a player to set their name color
+    permission: playertags.setcolor
+    usage: /namecolor <color1> [color2] [color...]
+    aliases: [setnamecolor, setcolor]
+  playertagsreload:
+    description: Reloads playertags
+    permission: playertags.reload
+    usage: /playertagsreload
+    aliases: [reloadplayertags]
+
+permissions:
+  playertags.reload:
+    description: If a player is allowed to reload the plugin
+    default: op
+  playertags.setcolor:
+    description: If a player is allowed to set their name color
+    default: true
+  playertags.setstyle:
+    description: If a player is allowed to include styles in their name color
+    default: true
+  playertags.allowyear:
+    description: If a player is allowed to reveive a yearbadge
+    default: true
+  playertags.forceyear:
+    description: If a player is forcibly given a yearbadge
+    default: false
+  playertags.ismod:
+    description: If a player should have a modbadge
+    default: false
+  playertags.isadmin:
+    description: If a player should have an adminbadge
+    default: false
