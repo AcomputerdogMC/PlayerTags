@@ -3,6 +3,7 @@ package net.acomputerdog.playertags;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -24,16 +25,17 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
     private File colorFolder;
     private File ageFolder;
 
-    private String yearBadge;
-    private String yearBadgeRaw;
-    private String modBadge;
-    private String modBadgeRaw;
-    private String adminBadge;
-    private String adminBadgeRaw;
-    private boolean highestRankOnly;
+    private boolean enableYearBadge;
+    private String yearBadgeChat;
+    private String yearBadgeList;
+    private int yearBadgePriority = 0;
 
-    //don't reset in onEnable or onDisable
-    private boolean reloading = false;
+    private boolean highestPriorityOnly;
+
+    private TagManager tagManager;
+
+    //set to true at end of onEnable
+    private boolean isLoaded = false;
 
     @Override
     public void onEnable() {
@@ -46,28 +48,30 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
             getLogger().warning("Unable to create age directory!");
         }
 
+        tagManager = new TagManager();
+
         readConfiguration();
 
+        //set colors for online players (in case of reload)
         for (Player p : getServer().getOnlinePlayers()) {
             onPlayerJoin(p);
         }
 
-        if (!reloading) {
+        if (!isLoaded) {
             getServer().getPluginManager().registerEvents(this, this);
         }
+
+        isLoaded = true;
     }
 
     @Override
     public void onDisable() {
+        tagManager = null;
         colorFolder = null;
         defaultColor = null;
         ageFolder = null;
-        yearBadge = null;
-        yearBadgeRaw = null;
-        modBadge = null;
-        modBadgeRaw = null;
-        adminBadge = null;
-        adminBadgeRaw = null;
+        yearBadgeChat = null;
+        yearBadgeList = null;
     }
 
     @EventHandler(priority =  EventPriority.MONITOR, ignoreCancelled = true)
@@ -103,15 +107,13 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
                 Player p = (Player)sender;
                 ChatColor[] colorArray = colors.toArray(new ChatColor[colors.size()]);
                 setPlayerColor(p, colorArray);
-                applyTags(p, colorsToString(colorArray), getBadgesFor(p), getRawBadgesFor(p));
+                applyTags(p, colorsToString(colorArray), getChatBadgesFor(p), getListBadgesFor(p));
                 sender.sendMessage(ChatColor.AQUA + "Color set.");
                 break;
             case "playertagsreload":
-                reloading = true;
                 reloadConfig();
                 onDisable();
                 onEnable();
-                reloading = false;
                 sender.sendMessage(ChatColor.YELLOW + "Reloaded.");
                 break;
             default:
@@ -122,24 +124,45 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
     }
 
     private void readConfiguration() {
-        getConfig().options().copyDefaults(true);
-        saveConfig();
+        saveDefaultConfig();
 
         defaultColor = ChatColor.valueOf(getConfig().getString("default_color"));
-        yearBadge = getConfig().getString("year_badge");
-        yearBadgeRaw = getConfig().getString("year_badge_raw");
-        modBadge = getConfig().getString("mod_badge");
-        modBadgeRaw = getConfig().getString("mod_badge_raw");
-        adminBadge = getConfig().getString("admin_badge");
-        adminBadgeRaw = getConfig().getString("admin_badge_raw");
-        highestRankOnly = getConfig().getBoolean("highest_rank_only");
+        highestPriorityOnly = getConfig().getBoolean("highest_priority_only");
+
+        enableYearBadge = getConfig().getBoolean("year_badge.enabled");
+        yearBadgeChat = getConfig().getString("year_badge.chat_tag");
+        yearBadgeList = getConfig().getString("year_badge.list_tag");
+        yearBadgePriority = getConfig().getInt("year_badge.priority");
+
+        //get all immediate subkeys of "tags"
+        for (String tagID : getConfig().getConfigurationSection("tags").getKeys(false)) {
+            //get the config section for this tag
+            ConfigurationSection section = getConfig().getConfigurationSection("tags." + tagID);
+            boolean tagEnabled = section.getBoolean("enabled", true); //check if section is enabled
+            if (tagEnabled) { //skip completely if "enabled" == false
+                if (tagManager.containsId(tagID)) {
+                    //will only print warning if duplicate AND enabled
+                    getLogger().warning("Duplicate tag: \"" + tagID + "\"");
+                } else {
+                    //load fields or set defaults
+                    int priority = section.getInt("priority", 0);
+                    String chatTag = section.getString("chat_tag", "");
+                    String listTag = section.getString("list_tag", "");
+                    String permission = section.getString("permission", "rank." + tagID);
+
+                    //actually create the tag
+                    Tag tag = new Tag(tagID, chatTag, listTag, permission, priority);
+                    tagManager.addTag(tag);
+                }
+            }
+        }
     }
 
     private void onPlayerJoin(Player p) {
         getPlayerAge(p); //read the player's age, or start counting if necessary.
         String colorString = colorsToString(getPlayerColors(p));
 
-        applyTags(p, colorString, getBadgesFor(p), getRawBadgesFor(p));
+        applyTags(p, colorString, getChatBadgesFor(p), getListBadgesFor(p));
     }
 
     private void applyTags(Player p, String color, String badges, String rawBadges) {
@@ -154,48 +177,54 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
         p.setDisplayName(displayName);
     }
 
-    private String getBadgesFor(Player p) {
-        return buildBadges(p, yearBadge, modBadge, adminBadge);
+    private String getChatBadgesFor(Player p) {
+        return buildBadges(p, yearBadgeChat, false);
     }
 
-    private String getRawBadgesFor(Player p) {
-        return buildBadges(p, yearBadgeRaw, modBadgeRaw, adminBadgeRaw);
+    private String getListBadgesFor(Player p) {
+        return buildBadges(p, yearBadgeList, true);
     }
 
-    private String buildBadges(Player p, String year, String mod, String admin) {
+    private String buildBadges(Player p, String year, boolean isList) {
         StringBuilder builder = new StringBuilder();
-        if (highestRankOnly) {
-            if (allowAdminBadge(p)) {
-                builder.append(admin);
-            } else if (allowModBadge(p)) {
-                builder.append(mod);
-            } else if (allowYearBadge(p)) {
-                builder.append(year);
-            }
-        } else {
-            if (allowYearBadge(p)) {
-                builder.append(year);
-            }
-            if (allowModBadge(p)) {
-                builder.append(mod);
-            }
-            if (allowAdminBadge(p)) {
-                builder.append(admin);
+        List<Tag> tags = tagManager.matchTags(t -> p.hasPermission(t.permission));
+        if (!tags.isEmpty()) { //make sure there is at least one tag
+            if (highestPriorityOnly) { //if we only want the highest priority, then grab the end of the list
+                Tag highest = tags.get(tags.size() - 1); //get highest priority tag
+                if (enableYearBadge && yearBadgePriority > highest.priority) { //if year is higher priority
+                    builder.append(year);
+                } else { //if tag is higher priority
+                    appendTagString(builder, highest, isList);
+                }
+            } else { //we want all tags
+                int lastPri = Integer.MIN_VALUE; //priority of previous tag
+                for (Tag tag : tags) {
+                    //check if the yearbadge priority fits here
+                    boolean isYearPriority = enableYearBadge && yearBadgePriority >= lastPri && yearBadgePriority < tag.priority;
+                    if (isYearPriority && allowYearBadge(p)) {
+                        builder.append(year);
+                    }
+                    appendTagString(builder, tag, isList);
+                    lastPri = tag.priority; //check last priority
+                }
+                if (enableYearBadge && yearBadgePriority >= lastPri) { //check if year has highest priority
+                    builder.append(year); //put year in place
+                }
             }
         }
         return builder.toString();
     }
 
+    private void appendTagString(StringBuilder builder, Tag tag, boolean isList) {
+        if (isList) {
+            builder.append(tag.listTag);
+        } else {
+            builder.append(tag.chatTag);
+        }
+    }
+
     private long unixTime() {
         return System.currentTimeMillis() / 1000L;
-    }
-
-    private boolean allowAdminBadge(Player p) {
-        return p.hasPermission("playertags.isadmin");
-    }
-
-    private boolean allowModBadge(Player p) {
-        return p.hasPermission("playertags.ismod");
     }
 
     private boolean allowYearBadge(Player p) {
@@ -223,20 +252,16 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
                     String line = reader.readLine();
                     try {
                         colors.add(ChatColor.valueOf(line.toUpperCase()));
-                        //return ChatColor.valueOf(line.toUpperCase());
                     } catch (IllegalArgumentException e) {
                         getLogger().warning("Corrupt color: " + line);
-                        //return defaultColor;
                     }
                 }
             } catch (IOException e) {
-                getLogger().severe("Exception reading player color for: " + p.getUniqueId().toString());
+                getLogger().severe("IOException reading player color for: " + p.getUniqueId().toString());
                 e.printStackTrace();
-                //return defaultColor;
             }
         } else {
             setPlayerColor(p, defaultColor);
-            //return defaultColor;
         }
         if (colors.isEmpty()) {
             colors.add(defaultColor);
@@ -262,18 +287,7 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
             }
         } else {
             setPlayerAge(p, unixTime());
-            //savePlayerAge(p);
             return unixTime();
-        }
-    }
-
-    private void savePlayerAge(Player p) {
-        File file = getAgeFileFor(p);
-        try (Writer writer = new FileWriter(file)) {
-            writer.write(String.valueOf(unixTime()) + "\n");
-        } catch (IOException e) {
-            getLogger().warning("Unable to save age for player: " + p.getName());
-            e.printStackTrace();
         }
     }
 

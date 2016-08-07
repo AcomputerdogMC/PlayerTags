@@ -1,5 +1,5 @@
 name: PlayerTags
-version: 0.2.0
+version: 1.1.0
 description: Gives players name colors and tags
 author: acomputerdog
 main: net.acomputerdog.playertags.PluginPlayerTags
@@ -31,10 +31,4 @@ permissions:
     default: true
   playertags.forceyear:
     description: If a player is forcibly given a yearbadge
-    default: false
-  playertags.ismod:
-    description: If a player should have a modbadge
-    default: false
-  playertags.isadmin:
-    description: If a player should have an adminbadge
     default: false
