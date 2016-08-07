@@ -1,5 +1,5 @@
 name: PlayerTags
-version: 0.1.0
+version: 0.2.0
 description: Gives players name colors and tags
 author: acomputerdog
 main: net.acomputerdog.playertags.PluginPlayerTags

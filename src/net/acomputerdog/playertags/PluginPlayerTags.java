@@ -8,14 +8,11 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class PluginPlayerTags extends JavaPlugin implements Listener {
 
@@ -33,6 +30,7 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
     private String modBadgeRaw;
     private String adminBadge;
     private String adminBadgeRaw;
+    private boolean highestRankOnly;
 
     //don't reset in onEnable or onDisable
     private boolean reloading = false;
@@ -134,6 +132,7 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
         modBadgeRaw = getConfig().getString("mod_badge_raw");
         adminBadge = getConfig().getString("admin_badge");
         adminBadgeRaw = getConfig().getString("admin_badge_raw");
+        highestRankOnly = getConfig().getBoolean("highest_rank_only");
     }
 
     private void onPlayerJoin(Player p) {
@@ -165,20 +164,42 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
 
     private String buildBadges(Player p, String year, String mod, String admin) {
         StringBuilder builder = new StringBuilder();
-        if (isYearOld(p) || p.hasPermission("playertags.forceyear")) {
-            builder.append(year);
-        }
-        if (p.hasPermission("playertags.ismod")) {
-            builder.append(mod);
-        }
-        if (p.hasPermission("playertags.isadmin")) {
-            builder.append(admin);
+        if (highestRankOnly) {
+            if (allowAdminBadge(p)) {
+                builder.append(admin);
+            } else if (allowModBadge(p)) {
+                builder.append(mod);
+            } else if (allowYearBadge(p)) {
+                builder.append(year);
+            }
+        } else {
+            if (allowYearBadge(p)) {
+                builder.append(year);
+            }
+            if (allowModBadge(p)) {
+                builder.append(mod);
+            }
+            if (allowAdminBadge(p)) {
+                builder.append(admin);
+            }
         }
         return builder.toString();
     }
 
     private long unixTime() {
         return System.currentTimeMillis() / 1000L;
+    }
+
+    private boolean allowAdminBadge(Player p) {
+        return p.hasPermission("playertags.isadmin");
+    }
+
+    private boolean allowModBadge(Player p) {
+        return p.hasPermission("playertags.ismod");
+    }
+
+    private boolean allowYearBadge(Player p) {
+        return isYearOld(p) || p.hasPermission("playertags.forceyear");
     }
 
     private boolean isYearOld(Player p) {

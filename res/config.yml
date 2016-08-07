@@ -20,3 +20,6 @@ admin_badge_raw: "□"
 
 #Color for players who have not chosen a color
 default_color: "GRAY"
+
+#If true only the highest rank (year, mod, admin) will be shown
+highest_rank_only: false
