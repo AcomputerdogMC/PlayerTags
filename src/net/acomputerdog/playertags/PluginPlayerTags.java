@@ -167,11 +167,7 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
 
     private void applyTags(Player p, String color, String badges, String rawBadges) {
         String listName = rawBadges + color + p.getName();
-        if (listName.length() <= 16) {
-            p.setPlayerListName(listName);
-        } else {
-            getLogger().warning("Player \"" + p.getName() + "\"'s name is too long!");
-        }
+        p.setPlayerListName(listName);
 
         String displayName = badges + CLEAR_FORMATTING + color + p.getName() + CLEAR_FORMATTING;
         p.setDisplayName(displayName);
