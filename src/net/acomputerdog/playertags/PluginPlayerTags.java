@@ -97,11 +97,15 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
                 }
                 List<ChatColor> colors = new ArrayList<>(args.length);
                 for (String str : args) {
-                    ChatColor color = ChatColor.valueOf(str.toUpperCase());
-                    if (color.isFormat() && !sender.hasPermission("playertags.setstyle")) {
-                        sender.sendMessage(ChatColor.RED + "You do not have permission for styles; skipping: " + str);
-                    } else {
-                        colors.add(color);
+                    try {
+                        ChatColor color = ChatColor.valueOf(str.toUpperCase());
+                        if (color.isFormat() && !sender.hasPermission("playertags.setstyle")) {
+                            sender.sendMessage(ChatColor.RED + "You do not have permission for styles; skipping: " + str);
+                        } else {
+                            colors.add(color);
+                        }
+                    } catch (IllegalArgumentException e) {
+                        sender.sendMessage(ChatColor.RED + "Unrecognized color code: " + str);
                     }
                 }
                 Player p = (Player)sender;
