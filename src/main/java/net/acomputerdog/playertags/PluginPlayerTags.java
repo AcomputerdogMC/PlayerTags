@@ -14,7 +14,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
 
+/**
+ * Plugin main class
+ *
+ * TODO database (again wtf with the data files)
+ */
 public class PluginPlayerTags extends JavaPlugin implements Listener {
 
     private static final String CLEAR_FORMATTING = ChatColor.RESET.toString() + ChatColor.WHITE.toString();
@@ -109,7 +115,7 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
                     }
                 }
                 Player p = (Player)sender;
-                ChatColor[] colorArray = colors.toArray(new ChatColor[colors.size()]);
+                ChatColor[] colorArray = colors.toArray(new ChatColor[0]);
                 setPlayerColor(p, colorArray);
                 applyTags(p, colorsToString(colorArray), getChatBadgesFor(p), getListBadgesFor(p));
                 sender.sendMessage(ChatColor.AQUA + "Color set.");
@@ -146,7 +152,7 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
             if (tagEnabled) { //skip completely if "enabled" == false
                 if (tagManager.containsId(tagID)) {
                     //will only print warning if duplicate AND enabled
-                    getLogger().warning("Duplicate tag: \"" + tagID + "\"");
+                    getLogger().warning(() -> "Duplicate tag: \"" + tagID + "\"");
                 } else {
                     //load fields or set defaults
                     int priority = section.getInt("priority", 0);
@@ -249,16 +255,17 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
         if (file.isFile()) {
             try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
                 while (reader.ready()) {
-                    String line = reader.readLine();
-                    try {
-                        colors.add(ChatColor.valueOf(line.toUpperCase()));
-                    } catch (IllegalArgumentException e) {
-                        getLogger().warning("Corrupt color: " + line);
+                    // parse and add color
+                    String colorName = reader.readLine();
+                    ChatColor color = parseColor(colorName);
+                    if (color != null) {
+                        colors.add(color);
+                    } else {
+                        throw new IOException("Invalid color: " + colorName);
                     }
                 }
             } catch (IOException e) {
-                getLogger().severe("IOException reading player color for: " + p.getUniqueId().toString());
-                e.printStackTrace();
+                getLogger().log(Level.SEVERE, "IOException reading player color for: " + p.getUniqueId().toString(), e);
             }
         } else {
             setPlayerColor(p, defaultColor);
@@ -266,20 +273,17 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
         if (colors.isEmpty()) {
             colors.add(defaultColor);
         }
-        return colors.toArray(new ChatColor[colors.size()]);
+        return colors.toArray(new ChatColor[0]);
     }
 
     private long getPlayerAge(Player p) {
         File file = getAgeFileFor(p);
         if (file.isFile()) {
             try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                String line = reader.readLine();
-                try {
-                    return Long.parseLong(line);
-                } catch (NumberFormatException e) {
-                    getLogger().warning("Corrupt age: " + line);
-                    return unixTime();
-                }
+                return Long.parseLong(reader.readLine());
+            } catch (NumberFormatException e) {
+                getLogger().warning("Corrupt age for: " + p.getUniqueId().toString());
+                return unixTime();
             } catch (IOException e) {
                 getLogger().severe("Exception reading player color for: " + p.getUniqueId().toString());
                 e.printStackTrace();
@@ -317,5 +321,16 @@ public class PluginPlayerTags extends JavaPlugin implements Listener {
 
     private File getAgeFileFor(Player p) {
         return new File(ageFolder, p.getUniqueId().toString() + ".dat");
+    }
+
+    private static ChatColor parseColor(String colorName) {
+        if (colorName == null) {
+            return null;
+        }
+        try {
+            return ChatColor.valueOf(colorName.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 }
