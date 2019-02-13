@@ -3,6 +3,7 @@ version: ${version}
 description: Gives players name colors and tags
 author: acomputerdog
 main: net.acomputerdog.playertags.PluginPlayerTags
+api-version: 1.13
 
 commands:
   namecolor:
